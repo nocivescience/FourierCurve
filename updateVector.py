@@ -25,6 +25,6 @@ class VectorScene(Scene):
         vector.add_updater(lambda v, dt: self.update_vector_2(v, mob, dt))
         return vector
     def update_vector_2(self, vector, mob, dt):
-        vector.move_to(mob.get_end())
+        vector.move_to(mob.get_end(), vector.get_start())
         vector.rotate(TAU * dt / 2, about_point=vector.get_start())
         return vector, mob
