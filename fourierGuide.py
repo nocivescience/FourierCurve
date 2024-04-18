@@ -200,7 +200,6 @@ class AbstractFourierOfTexSymbol(ZoomedScene):
         coef = vector.coefficient
         freq = vector.freq
         phase = np.log(coef).imag
- 
         vector.set_length(abs(coef))
         vector.set_angle(phase + time * freq * TAU)
         vector.shift(vector.center_func() - vector.get_start())
