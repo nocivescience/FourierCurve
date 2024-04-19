@@ -1,6 +1,6 @@
 from manim import *
 import itertools as it
-class FourierScene(Scene):
+class FourierManim(Scene):
     CONFIG={
         'wait_time': 12,
         'vector_config':{
@@ -19,17 +19,13 @@ class FourierScene(Scene):
         self.wait(self.CONFIG['wait_time'])
     def get_freqs(self):
         n=self.CONFIG['n_vectors']
-        all_freqs = list(range(n//2,-n//2,-1))
-        all_freqs.sort(key=abs)
-        return all_freqs
+        return reversed(list(np.linspace(0.3,1,n)))
     def get_coefficients(self):
         n=self.CONFIG['n_vectors']
-        lista=[i*4 for i in np.random.random(size=n)]
-        return lista
+        return [complex(n*.2) for _ in reversed(range(n))]
     def get_rotating_vectors(self,freqs=None, coeffs=None):
         vectors=VGroup()
         self.center_tracker=VectorizedPoint(self.CONFIG['center_point'])
-        print(type(self.center_tracker))
         if freqs is None:
             freqs=self.get_freqs()
         if coeffs is None:
@@ -40,7 +36,6 @@ class FourierScene(Scene):
                 center_func= last_vector.get_end
             else:
                 center_func=self.center_tracker.get_location
-                print(type(center_func))
             random=np.random.random()
             if random<.5:
                 spin=-1
@@ -52,7 +47,6 @@ class FourierScene(Scene):
         return vectors
     def get_rotating_vector(self,coeff,freq,center_func, spin):
         vector=Vector(**self.CONFIG['vector_config'])
-        print(type(vector.get_center()))
         vector.coeff=coeff
         vector.freq=freq
         vector.center_func=center_func
