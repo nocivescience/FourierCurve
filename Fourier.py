@@ -1,4 +1,6 @@
 from manim import *
+import functools as ft
+import operator as op
 class FourierCirclesScene(Scene):
     configuration = {
         'n_vectors': 20,
@@ -99,6 +101,40 @@ class FourierCirclesScene(Scene):
         return VGroup(*[
             self.get_circle(vector) for vector in vectors
         ])
+    def get_vector_sum(self, vectors, color= YELLOW):
+        coefs=[v.coefficient for v in vectors]
+        freqs=[v.freq for v in vectors]
+        center=vectors[0].get_start()
+        path=ParametricFunction(
+            lambda t: center+ft.reduce(op.add,[
+                coef*np.exp(TAU*1j*freq*t)
+                for coef, freq in zip(coefs, freqs)
+            ]),
+            t_range=[0,1],
+            color=color,
+            # step_size= 0.01,
+        )
+        return path
+    def get_drawn_path(self, vectors, stroke_width=2, color=WHITE):
+        path=self.get_vector_sum(vectors, color=color)
+        broken_path=CurvesAsSubmobjects(path)
+        start, end=[0, 1]
+        def update_path(path, dt):
+            alpha= ValueTracker(0).get_value()
+            n_curves=len(path)
+            for a, sp in zip(np.linspace(0,1, n_curves), path):
+                b=alpha-a
+                if b<0:
+                    width=0
+                else:
+                    width= stroke_width*interpolate(
+                        start, end, (1-b%1)
+                    )
+                sp.set_stroke(width= width)
+            return path
+        broken_path.set_color(YELLOW)
+        broken_path.add_updater(update_path)
+        return broken_path
 class FourierScene(FourierCirclesScene):
     configuracion = {
         'n_vectors': 20,
@@ -130,7 +166,8 @@ class FourierScene(FourierCirclesScene):
         coefs=self.get_coefficients_of_path(path)
         vectors=self.get_rotating_vectors(coefficients=coefs)
         circles=self.get_circles(vectors)
-        self.add(vectors, circles)
+        drawn_path=self.get_drawn_path(vectors)
+        self.add(vectors, circles, drawn_path)
     def get_path(self):
         tex_mob=Tex('Ri',**self.configuracion['tex_config'])
         tex_mob.set_height(3)
