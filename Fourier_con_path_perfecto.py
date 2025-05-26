@@ -12,7 +12,10 @@ class FourierCirclesScene(Scene):
             'max_stroke_width_to_length_ratio': 10,
             'stroke_width': 1.7,
         },
-        'slow_factor': .08,
+        'slow_factor': 0.5,
+        "parametric_function_step_size": 0.001,
+        "drawn_path_stroke_width": 2,
+        'interpolate_config': [0, 1],
         'circle_config': {
             'stroke_width': 1,
         },
@@ -34,8 +37,7 @@ class FourierCirclesScene(Scene):
             freqs=self.get_freqs()
         dt=1/n_samples
         ts=np.arange(0,1,dt)
-        samples = np.array([path.point_from_proportion(t) for t in ts if 0 <= t <= 1])
-        # samples=np.array([path.point_from_proportion(t) for t in ts])
+        samples=np.array([path.point_from_proportion(t) for t in ts])
         samples-=self.configuration['center_point']
         complex_samples=samples[:,0]+1j*samples[:,1]
         return [
@@ -102,54 +104,58 @@ class FourierCirclesScene(Scene):
         return VGroup(*[
             self.get_circle(vector) for vector in vectors
         ])
-    def get_vector_sum(self, vectors, color= YELLOW):
-        coefs=[v.coefficient for v in vectors]
-        freqs=[v.freq for v in vectors]
-        center=vectors[0].get_start()
-        path=ParametricFunction(
-            lambda t: center+ft.reduce(op.add,[
-                coef*np.exp(TAU*1j*freq*t)
-                for coef, freq in zip(coefs, freqs)
-            ]),
-            t_range=[0,1],
-            color=color,
-            # step_size= 0.01,
-        )
-        return path
-    def get_drawn_path(self, vectors, stroke_width=2, color=WHITE):
-        path = self.get_vector_sum(vectors, color=color)
+        
+    def get_drawn_path_alpha(self):
+        return self.get_vector_time()
+    def get_drawn_path(self, vectors, stroke_width=None, **kwargs):
+        if stroke_width is None:
+            stroke_width = self.configuration['drawn_path_stroke_width']
+        path = self.get_vector_sum_path(vectors, **kwargs)
         broken_path = CurvesAsSubmobjects(path)
-        alpha_tracker = ValueTracker(0)
-        self.add(broken_path, alpha_tracker)
-    
-        start, end = [0, 1]
-    
+        broken_path.curr_time = 0
+        start, end = self.configuration['interpolate_config']
         def update_path(path, dt):
-            alpha_tracker.increment_value(dt * self.configuration['slow_factor'])
-            alpha = alpha_tracker.get_value()
+            alpha = self.get_drawn_path_alpha()
             n_curves = len(path)
             for a, sp in zip(np.linspace(0, 1, n_curves), path):
-                b = alpha - a
+                b = (alpha - a)
                 if b < 0:
                     width = 0
                 else:
-                    width = stroke_width * interpolate(start, end, (1 - b % 1))
+                    width = stroke_width * interpolate(start, end, (1 - (b % 1)))
                 sp.set_stroke(width=width)
+            path.curr_time += dt
             return path
-    
-        broken_path.set_color(YELLOW)
+        broken_path.set_color(RED)
         broken_path.add_updater(update_path)
         return broken_path
+        
+    def get_vector_sum_path(self, vectors, color=YELLOW):
+        coefs = [v.coefficient for v in vectors]
+        freqs = [v.freq for v in vectors]
+        center = vectors[0].get_start()
+        path = ParametricFunction(
+            lambda t: center + ft.reduce(op.add, [
+                complex_to_R3(
+                    coef * np.exp(TAU * 1j * freq * t)
+                )
+                for coef, freq in zip(coefs, freqs)
+            ]),
+            t_range=[0, 1],
+            color=color,
+            # step_size=self.configuration['parametric_function_step_size'],
+        )
+        return path
 
 class FourierScene(FourierCirclesScene):
     configuracion = {
         'n_vectors': 20,
         'center_point': ORIGIN,
-        'slow_factor': .7,
+        'slow_factor': 0.05,
         'n_cycles': None,
         'tex_config': {
             'fill_opacity': 0,
-            'stroke_width': 1,
+            'stroke_width': .1,
             'stroke_color': WHITE,
         },
     }
@@ -165,24 +171,17 @@ class FourierScene(FourierCirclesScene):
         self.add(self.get_path())
         self.wait(10)
     def run_one_cycles(self):
-        time=1/self.configuracion['slow_factor']
-        print(f'Running cycle {self.configuracion["slow_factor"]}')
+        time=1/self.configuration['slow_factor']
         self.wait(time)
     def add_vectors_circles_path(self):
         path=self.get_path()
         coefs=self.get_coefficients_of_path(path)
         vectors=self.get_rotating_vectors(coefficients=coefs)
         circles=self.get_circles(vectors)
-        drawn_path=self.get_drawn_path(vectors)
+        drawn_path = self.get_drawn_path(vectors)
         self.add(vectors, circles, drawn_path)
     def get_path(self):
-        tex_mob = Tex('R', **self.configuracion['tex_config'])
+        tex_mob=Tex('Ri',**self.configuracion['tex_config'])
         tex_mob.set_height(3)
-        path_group = tex_mob.family_members_with_points()
-        full_path = VMobject()
-        for submob in path_group:
-            # Subdivide para tener más puntos, necesarios para Fourier
-            submob.insert_n_curves(100)
-            full_path.append_points(submob.get_points())
-        full_path.center()  # Opcional: centrar el path
-        return full_path
+        path=tex_mob.family_members_with_points()[0]
+        return path
